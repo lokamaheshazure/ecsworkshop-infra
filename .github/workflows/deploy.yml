@@ -1,4 +1,4 @@
-name: Deploy Infrastructure
+name: Infrastructure - ${{ github.event.inputs.action || 'deploy' }}
 
 on:
   push:
@@ -15,6 +15,11 @@ on:
         options:
           - deploy
           - delete
+
+run-name: >
+  Infrastructure ${{ github.event.inputs.action == 'delete' && 'Deletion' || 'Deployment' }}
+  triggered by ${{ github.actor }} on
+  ${{ github.ref_name }}
 
 jobs:
   deploy:
@@ -42,14 +47,14 @@ jobs:
           aws sts get-caller-identity
 
       ############################################################
-      # DEPLOY SECTION
+      # DEPLOY
       ############################################################
-
       - name: Deploy Network Stack
         if: |
           github.event_name == 'push' ||
           github.event.inputs.action == 'deploy'
         run: |
+          echo "Action: DEPLOYING network stack"
           aws cloudformation deploy \
             --template-file templates/network-stack.cf.yml \
             --stack-name ecs-network-stack \
@@ -60,6 +65,8 @@ jobs:
           github.event_name == 'push' ||
           github.event.inputs.action == 'deploy'
         run: |
+          echo "Action: DEPLOYING ECS stack"
+
           VPC_ID=$(aws cloudformation describe-stacks --stack-name ecs-network-stack --query "Stacks[0].Outputs[?OutputKey=='VpcId'].OutputValue" --output text)
           PUB1=$(aws cloudformation describe-stacks --stack-name ecs-network-stack --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet1Id'].OutputValue" --output text)
           PUB2=$(aws cloudformation describe-stacks --stack-name ecs-network-stack --query "Stacks[0].Outputs[?OutputKey=='PublicSubnet2Id'].OutputValue" --output text)
@@ -79,23 +86,22 @@ jobs:
               PrivateSubnet2Id=$PRI2
 
       ############################################################
-      # DELETE SECTION
+      # DELETE
       ############################################################
-
       - name: Delete ECS Stack
         if: github.event.inputs.action == 'delete'
         run: |
-          echo "Deleting ECS stack..."
+          echo "Action: DELETING ECS stack"
           aws cloudformation delete-stack --stack-name ecs-app-stack --region us-east-1
           aws cloudformation wait stack-delete-complete --stack-name ecs-app-stack
 
       - name: Delete Network Stack
         if: github.event.inputs.action == 'delete'
         run: |
-          echo "Deleting Network stack..."
+          echo "Action: DELETING network stack"
           aws cloudformation delete-stack --stack-name ecs-network-stack --region us-east-1
           aws cloudformation wait stack-delete-complete --stack-name ecs-network-stack
 
-      - name: Action Completed
+      - name: Completed
         run: |
-         echo "Task completed: ${{ github.event.inputs.action || 'deploy' }}"
+          echo "Pipeline completed for action: ${{ github.event.inputs.action || 'deploy' }}"
