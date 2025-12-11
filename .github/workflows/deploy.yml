@@ -97,4 +97,5 @@ jobs:
           aws cloudformation wait stack-delete-complete --stack-name ecs-network-stack
 
       - name: Action Completed
-        run: echo "Task completed: ${{ github.event.inputs.action || 'deploy' }}"
+        run: |
+         echo "Task completed: ${{ github.event.inputs.action || 'deploy' }}"
